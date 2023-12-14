@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Change Demo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Color Change Demo</h1>
+
+    <form method="post" enctype="multipart/form-data">
+        <label for="single_image">Upload a single image:</label>
+        <input type="file" name="single_image" accept=".jpg, .jpeg, .png">
+        
+        <label for="group_image">Upload a group image:</label>
+        <input type="file" name="group_image" accept=".jpg, .jpeg, .png">
+
+        <button type="submit">Submit</button>
+    </form>
+
+    <div>
+        {% for img in changed_images %}
+            <img src="{{ url_for('static', filename='images/changed_image_' + loop.index|string + '.png') }}" alt="Changed Image" width="300" height="200">
+        {% endfor %}
+    </div>
+</body>
+</html>
