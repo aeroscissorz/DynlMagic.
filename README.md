@@ -1,6 +1,6 @@
 # DynlMagic
 
-![UI Screenshot](/path/to/screenshot.png)
+![UI Screenshot]([/path/to/screenshot.png](https://github.com/aeroscissorz/DynlMagic.github.io/blob/main/Screenshot%202023-12-14%20213827.png))
 
 ## How to Run
 
