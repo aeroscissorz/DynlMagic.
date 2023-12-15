@@ -1,0 +1,27 @@
+/* Add your custom styles here */
+.color-buttons {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.color-button {
+    max-width: 200px;
+    max-height: 100px;
+    width: auto;
+    height: auto;
+    margin: 5px;
+}
+
+.changed-image-container {
+    max-width: 400px;
+    max-height: 200px;
+    width: auto;
+    height: auto;
+    margin-top: 10px;
+    overflow: hidden; /* Ensure the image doesn't overflow the container */
+}
+
+.changed-image {
+    width: 100%; /* Ensure the image scales within the container */
+    height: auto; /* Automatically adjust the height while maintaining aspect ratio */
+}
