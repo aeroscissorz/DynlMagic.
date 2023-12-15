@@ -3,26 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Color Change Demo</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>DynlMagic</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>DynlMagic</h1>
+    <h1>Color Change App</h1>
 
     <form method="post" enctype="multipart/form-data">
-        <label for="single_image">Upload a single image:</label>
-        <input type="file" name="single_image" accept=".jpg, .jpeg, .png">
-        
-        <label for="group_image">Upload a group image:</label>
-        <input type="file" name="group_image" accept=".jpg, .jpeg, .png">
-
+        <label for="single_image">Upload Single Image:</label>
+        <input type="file" name="single_image" accept=".jpg, .jpeg, .png" required>
+        <br>
+        <label for="group_image">Upload Group Image:</label>
+        <input type="file" name="group_image" accept=".jpg, .jpeg, .png" required>
+        <br>
         <button type="submit">Submit</button>
     </form>
 
-    <div>
-        {% for img in changed_images %}
-            <img src="{{ url_for('static', filename='images/changed_image_' + loop.index|string + '.png') }}" alt="Changed Image" width="300" height="200">
-        {% endfor %}
-    </div>
+    {% if dominant_colors %}
+        <h2>Dominant Colors:</h2>
+        <div class="color-buttons">
+            {% for color in dominant_colors %}
+                <form method="post" action="/show_changed_image">
+                    <input type="hidden" name="color_index" value="{{ loop.index0 }}">
+                    <button type="submit" class="color-button" style="background-color: rgb({{ color[0] }}, {{ color[1] }}, {{ color[2] }});">
+                        Dominant Color {{ loop.index }}
+                    </button>
+                </form>
+            {% endfor %}
+        </div>
+    {% endif %}
+    
+    {% if changed_image %}
+        <div class="changed-image-container">
+            <h2>Changed Image:</h2>
+            {{ changed_image | safe }}
+        </div>
+    {% endif %}
 </body>
 </html>
