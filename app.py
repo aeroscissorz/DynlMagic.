@@ -1,11 +1,16 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 import cv2
 import numpy as np
 from skimage.color import rgb2lab, lab2rgb
 from base64 import b64encode
 from io import BytesIO
+from PIL import Image
 
 app = Flask(__name__)
+
+img_single_lab = None
+img_single_rgb = None
+dominant_colors_group_lab = None  # Initialize as a global variable
 
 def find_dominant_colors(img, num_colors=15):
     pixels = img.reshape((-1, 3))
@@ -39,46 +44,54 @@ def change_color_lab(img_lab, target_color_lab, replacement_color_lab, threshold
 @app.route('/', methods=['GET', 'POST'])
 def index():
     changed_images = []
+    dominant_colors = []
+
+    global img_single_lab, img_single_rgb, dominant_colors_group_lab
 
     if request.method == 'POST':
-        # Handle file uploads from the user
         single_image = request.files['single_image']
         group_image = request.files['group_image']
 
         if single_image and group_image and allowed_file(single_image.filename) and allowed_file(group_image.filename):
-            # Read the uploaded images
             img_single = cv2.imdecode(np.frombuffer(single_image.read(), np.uint8), cv2.IMREAD_COLOR)
             img_single_rgb = cv2.cvtColor(img_single, cv2.COLOR_BGR2RGB)
 
             img_group = cv2.imdecode(np.frombuffer(group_image.read(), np.uint8), cv2.IMREAD_COLOR)
             img_group = cv2.cvtColor(img_group, cv2.COLOR_BGR2RGB)
 
-            # Get the dominant colors from img_group and convert to LAB color space
             dominant_colors_group = find_dominant_colors(img_group, num_colors=15)
             dominant_colors_group_lab = rgb_to_lab(dominant_colors_group)
 
-            # Convert img_single to LAB color space
+            print("Dominant Colors:")
+            for color in dominant_colors_group:
+                print(color)
+                dominant_colors.append(color.tolist())
+
             img_single_lab = rgb_to_lab(img_single_rgb)
 
-            for i in range(len(dominant_colors_group)):
-                img_color_changed_lab = change_color_lab(
-                    np.copy(img_single_lab),
-                    rgb_to_lab(np.array([find_dominant_color(img_single_rgb)])),
-                    dominant_colors_group_lab[i],
-                    threshold=30
-                )
-                img_color_changed_rgb = lab_to_rgb(img_color_changed_lab)
+    return render_template('index.html', dominant_colors=dominant_colors)
 
-                # Convert the modified image to base64 for displaying in HTML
-                img_buffer = BytesIO()
-                cv2.imwrite('static/images/changed_image_{}.png'.format(i), cv2.cvtColor(img_color_changed_rgb, cv2.COLOR_RGB2BGR))
-                img_array = np.asarray(bytearray(img_buffer.read()), dtype=np.uint8)
-                img_b64 = b64encode(img_array).decode('utf-8')
-                changed_images.append(img_b64)
+@app.route('/show_changed_image', methods=['POST'])
+def show_changed_image():
+    global img_single_lab, img_single_rgb, dominant_colors_group_lab
 
-    return render_template('index.html', changed_images=changed_images)
+    color_index = int(request.form['color_index'])
 
-# Function to check if the file extension is allowed
+    img_color_changed_lab = change_color_lab(
+        np.copy(img_single_lab),
+        rgb_to_lab(np.array([find_dominant_color(img_single_rgb)])),
+        dominant_colors_group_lab[color_index],
+        threshold=30
+    )
+    img_color_changed_rgb = lab_to_rgb(img_color_changed_lab)
+
+    img_buffer = BytesIO()
+    pil_image = Image.fromarray(img_color_changed_rgb)
+    pil_image.save(img_buffer, format="PNG")
+    img_b64 = b64encode(img_buffer.getvalue()).decode('utf-8')
+
+    return f'<img src="data:image/png;base64,{img_b64}" alt="Changed Image">'
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'jpg', 'jpeg', 'png'}
 
