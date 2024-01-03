@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, send_from_directory, url_for
+import os
 import cv2
 import numpy as np
 from skimage.color import rgb2lab, lab2rgb
@@ -8,9 +9,15 @@ from PIL import Image
 
 app = Flask(__name__)
 
+UPLOAD_FOLDER = 'uploads'
+STATIC_IMAGES_FOLDER = 'static-images'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 img_single_lab = None
 img_single_rgb = None
-dominant_colors_group_lab = None  # Initialize as a global variable
+dominant_colors_group_lab = None
+img_group = None
+color_changed = False  # Added variable to track color change
 
 def find_dominant_colors(img, num_colors=15):
     pixels = img.reshape((-1, 3))
@@ -41,12 +48,23 @@ def change_color_lab(img_lab, target_color_lab, replacement_color_lab, threshold
     img_lab[mask] = replacement_color_lab
     return img_lab
 
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'jpg', 'jpeg', 'png'}
+
+def get_image_preview(image):
+    img_buffer = BytesIO()
+    pil_image = Image.fromarray(image)
+    pil_image.save(img_buffer, format="PNG")
+    img_b64 = b64encode(img_buffer.getvalue()).decode('utf-8')
+    return f'data:image/png;base64,{img_b64}'
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    changed_images = []
-    dominant_colors = []
+    global img_single_rgb, img_single_lab, dominant_colors_group_lab, img_group, color_changed
 
-    global img_single_lab, img_single_rgb, dominant_colors_group_lab
+    single_image_preview = None
+    group_image_preview = None
+    dominant_colors_group = []
 
     if request.method == 'POST':
         single_image = request.files['single_image']
@@ -62,25 +80,26 @@ def index():
             dominant_colors_group = find_dominant_colors(img_group, num_colors=15)
             dominant_colors_group_lab = rgb_to_lab(dominant_colors_group)
 
-            print("Dominant Colors:")
-            for color in dominant_colors_group:
-                print(color)
-                dominant_colors.append(color.tolist())
+            single_image_preview = get_image_preview(img_single_rgb)
+            group_image_preview = get_image_preview(img_group)
 
             img_single_lab = rgb_to_lab(img_single_rgb)
+            color_changed = False  # Reset color_changed variable
 
-    return render_template('index.html', dominant_colors=dominant_colors)
+    return render_template('index.html', single_image_preview=single_image_preview,
+                           group_image_preview=group_image_preview, dominant_colors_group=dominant_colors_group,
+                           changed_image=None, color_changed=color_changed)
 
 @app.route('/show_changed_image', methods=['POST'])
 def show_changed_image():
-    global img_single_lab, img_single_rgb, dominant_colors_group_lab
+    global img_single_lab, img_single_rgb, dominant_colors_group_lab, img_group, color_changed
 
     color_index = int(request.form['color_index'])
 
     img_color_changed_lab = change_color_lab(
         np.copy(img_single_lab),
         rgb_to_lab(np.array([find_dominant_color(img_single_rgb)])),
-        dominant_colors_group_lab[color_index],
+        dominant_colors_group_lab[color_index - 1],
         threshold=30
     )
     img_color_changed_rgb = lab_to_rgb(img_color_changed_lab)
@@ -90,10 +109,13 @@ def show_changed_image():
     pil_image.save(img_buffer, format="PNG")
     img_b64 = b64encode(img_buffer.getvalue()).decode('utf-8')
 
-    return f'<img src="data:image/png;base64,{img_b64}" alt="Changed Image">'
+    changed_image = f'data:image/png;base64,{img_b64}'
+    color_changed = True  # Set color_changed to True after color change
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'jpg', 'jpeg', 'png'}
+    return render_template('index.html', changed_image=changed_image, single_image_preview=get_image_preview(img_single_rgb),
+                           group_image_preview=get_image_preview(img_group),
+                           dominant_colors_group=[list(color) for color in dominant_colors_group_lab],
+                           color_changed=color_changed)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -3,41 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DynlMagic</title>
-    <link rel="stylesheet" href="style.css">
+    <title>DynlMagic Color Change Demo</title>
 </head>
 <body>
-    <h1>Color Change App</h1>
+    <h1>DynlMagic Color Change Demo</h1>
 
-    <form method="post" enctype="multipart/form-data">
-        <label for="single_image">Upload Single Image:</label>
-        <input type="file" name="single_image" accept=".jpg, .jpeg, .png" required>
-        <br>
-        <label for="group_image">Upload Group Image:</label>
-        <input type="file" name="group_image" accept=".jpg, .jpeg, .png" required>
-        <br>
-        <button type="submit">Submit</button>
-    </form>
+    {% if single_image_preview and group_image_preview %}
+        <h2>Submitted Images:</h2>
+        <div class="image-preview">
+            <div class="image-container">
+                <h3>Single Image</h3>
+                <img class="preview-image" src="{{ single_image_preview }}" alt="Single Image Preview">
+            </div>
+            <div class="image-container">
+                <h3>Group Image</h3>
+                <img class="preview-image" src="{{ group_image_preview }}" alt="Group Image Preview">
+            </div>
+        </div>
+        {% if changed_image %}
+            <div id="modifiedImage">
+                <h2>Changed Image:</h2>
+                <img class="changed-image" src="{{ changed_image }}" alt="Changed Image">
+            </div>
+        {% endif %}
+        {% if not color_changed %}
+            <form method="post" action="{{ url_for('show_changed_image') }}">
+                <label>Select a color:</label>
+                <div class="color-buttons">
+                    {% for color in dominant_colors_group %}
+                        <button type="submit" name="color_index" value="{{ loop.index }}">
+                            <div class="color-button" style="background-color: rgb({{ color[0] }}, {{ color[1] }}, {{ color[2] }});">
+                                Color {{ loop.index + 1 }}
+                            </div>
+                        </button>
+                    {% endfor %}
+                </div>
+            </form>
+        {% endif %}
+    {% else %}
+        <form method="post" enctype="multipart/form-data">
+            <label for="single_image">Upload a single image:</label>
+            <input type="file" name="single_image" accept=".jpg, .jpeg, .png" aria-label="Choose a single image">
 
-    {% if dominant_colors %}
-        <h2>Dominant Colors:</h2>
-        <div class="color-buttons">
-            {% for color in dominant_colors %}
-                <form method="post" action="/show_changed_image">
-                    <input type="hidden" name="color_index" value="{{ loop.index0 }}">
-                    <button type="submit" class="color-button" style="background-color: rgb({{ color[0] }}, {{ color[1] }}, {{ color[2] }});">
-                        Dominant Color {{ loop.index }}
-                    </button>
-                </form>
-            {% endfor %}
-        </div>
-    {% endif %}
-    
-    {% if changed_image %}
-        <div class="changed-image-container">
-            <h2>Changed Image:</h2>
-            {{ changed_image | safe }}
-        </div>
+            <label for="group_image">Upload a group image:</label>
+            <input type="file" name="group_image" accept=".jpg, .jpeg, .png" aria-label="Choose a group image">
+
+            <div class="button-container">
+                <button type="submit">Submit</button>
+            </div>
+        </form>
     {% endif %}
 </body>
 </html>
