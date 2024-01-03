@@ -7,5 +7,7 @@
 			"path": "../../DynlMagic"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "DynlMagic.github.io"
+	}
 }
