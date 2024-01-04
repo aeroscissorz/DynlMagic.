@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_from_directory, url_for
+from flask import Flask, render_template, request, send_from_directory
 import os
 import cv2
 import numpy as np
@@ -17,7 +17,7 @@ img_single_lab = None
 img_single_rgb = None
 dominant_colors_group_lab = None
 img_group = None
-color_changed = False  # Added variable to track color change
+color_changed = False
 
 def find_dominant_colors(img, num_colors=15):
     pixels = img.reshape((-1, 3))
@@ -42,10 +42,20 @@ def lab_to_rgb(img_lab):
     img_rgb = (img_rgb * 255).astype(np.uint8)
     return img_rgb
 
-def change_color_lab(img_lab, target_color_lab, replacement_color_lab, threshold=60):
+def change_color_lab(img_lab, target_color_lab, replacement_color_lab, threshold=60, alpha=2):
+    """
+    Change color of the image in LAB color space with a smooth transition.
+    
+    :param img_lab: Original image in LAB color space.
+    :param target_color_lab: Target color in LAB space to be replaced.
+    :param replacement_color_lab: Replacement color in LAB space.
+    :param threshold: Distance threshold for color replacement.
+    :param alpha: Controls the intensity of the color change (0.0 to 1.0).
+    :return: Image with color changed in LAB color space.
+    """
     distance = np.linalg.norm(img_lab - target_color_lab, axis=-1)
     mask = distance < threshold
-    img_lab[mask] = replacement_color_lab
+    img_lab[mask] = alpha * replacement_color_lab + (1 - alpha) * img_lab[mask]
     return img_lab
 
 def allowed_file(filename):
@@ -84,7 +94,7 @@ def index():
             group_image_preview = get_image_preview(img_group)
 
             img_single_lab = rgb_to_lab(img_single_rgb)
-            color_changed = False  # Reset color_changed variable
+            color_changed = False
 
     return render_template('index.html', single_image_preview=single_image_preview,
                            group_image_preview=group_image_preview, dominant_colors_group=dominant_colors_group,
@@ -100,7 +110,8 @@ def show_changed_image():
         np.copy(img_single_lab),
         rgb_to_lab(np.array([find_dominant_color(img_single_rgb)])),
         dominant_colors_group_lab[color_index - 1],
-        threshold=30
+        threshold=30,
+        alpha=0.5
     )
     img_color_changed_rgb = lab_to_rgb(img_color_changed_lab)
 
@@ -110,7 +121,7 @@ def show_changed_image():
     img_b64 = b64encode(img_buffer.getvalue()).decode('utf-8')
 
     changed_image = f'data:image/png;base64,{img_b64}'
-    color_changed = True  # Set color_changed to True after color change
+    color_changed = True
 
     return render_template('index.html', changed_image=changed_image, single_image_preview=get_image_preview(img_single_rgb),
                            group_image_preview=get_image_preview(img_group),
