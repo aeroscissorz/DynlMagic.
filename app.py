@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_from_directory
+from flask import Flask, render_template, request
 import os
 import cv2
 import numpy as np
@@ -42,19 +42,15 @@ def lab_to_rgb(img_lab):
     img_rgb = (img_rgb * 255).astype(np.uint8)
     return img_rgb
 
-def change_color_lab(img_lab, target_color_lab, replacement_color_lab, threshold=60, alpha=2):
-    """
-    Change color of the image in LAB color space with a smooth transition.
-    
-    :param img_lab: Original image in LAB color space.
-    :param target_color_lab: Target color in LAB space to be replaced.
-    :param replacement_color_lab: Replacement color in LAB space.
-    :param threshold: Distance threshold for color replacement.
-    :param alpha: Controls the intensity of the color change (0.0 to 1.0).
-    :return: Image with color changed in LAB color space.
-    """
+def change_color_lab(img_lab, target_color_lab, replacement_color_lab, threshold=35, alpha=0.5, intensity_threshold_factor=50):
     distance = np.linalg.norm(img_lab - target_color_lab, axis=-1)
-    mask = distance < threshold
+    
+    # Calculate intensity threshold based on the average intensity of the target color
+    target_intensity = target_color_lab[0, 0]
+    intensity_threshold = target_intensity / intensity_threshold_factor
+    
+    intensity_mask = img_lab[:, :, 0] > intensity_threshold
+    mask = (distance < threshold) & intensity_mask
     img_lab[mask] = alpha * replacement_color_lab + (1 - alpha) * img_lab[mask]
     return img_lab
 
@@ -110,8 +106,9 @@ def show_changed_image():
         np.copy(img_single_lab),
         rgb_to_lab(np.array([find_dominant_color(img_single_rgb)])),
         dominant_colors_group_lab[color_index - 1],
-        threshold=30,
-        alpha=0.5
+        threshold=35,
+        alpha=0.5,
+        intensity_threshold_factor=50  # Adjust this factor as needed
     )
     img_color_changed_rgb = lab_to_rgb(img_color_changed_lab)
 
