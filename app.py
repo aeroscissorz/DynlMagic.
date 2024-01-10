@@ -42,8 +42,8 @@ def lab_to_rgb(img_lab):
     img_rgb = (img_rgb * 255).astype(np.uint8)
     return img_rgb
 
-def change_color_lab(img_lab, target_color_lab, replacement_color_lab, threshold=35, alpha=0.5, intensity_threshold_factor=50):
-    distance = np.linalg.norm(img_lab - target_color_lab, axis=-1)
+def change_dominant_color_lab(img_lab, target_color_lab, replacement_color_lab, threshold=15, intensity_threshold_factor=50):
+    distance = np.linalg.norm(img_lab[:, :, 1:] - target_color_lab[:, 1:], axis=-1)
     
     # Calculate intensity threshold based on the average intensity of the target color
     target_intensity = target_color_lab[0, 0]
@@ -51,7 +51,10 @@ def change_color_lab(img_lab, target_color_lab, replacement_color_lab, threshold
     
     intensity_mask = img_lab[:, :, 0] > intensity_threshold
     mask = (distance < threshold) & intensity_mask
-    img_lab[mask] = alpha * replacement_color_lab + (1 - alpha) * img_lab[mask]
+    
+    # Blend the colors instead of directly replacing
+    img_lab[mask, 1:] = (img_lab[mask, 1:] + replacement_color_lab[1:]) / 2
+    
     return img_lab
 
 def allowed_file(filename):
@@ -102,12 +105,12 @@ def show_changed_image():
 
     color_index = int(request.form['color_index'])
 
-    img_color_changed_lab = change_color_lab(
+    # Target only the dominant color in the single image
+    img_color_changed_lab = change_dominant_color_lab(
         np.copy(img_single_lab),
         rgb_to_lab(np.array([find_dominant_color(img_single_rgb)])),
         dominant_colors_group_lab[color_index - 1],
         threshold=35,
-        alpha=0.5,
         intensity_threshold_factor=50  # Adjust this factor as needed
     )
     img_color_changed_rgb = lab_to_rgb(img_color_changed_lab)
