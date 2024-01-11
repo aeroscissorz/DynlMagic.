@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request
+import os
 import cv2
 import numpy as np
+from skimage.color import rgb2lab, lab2rgb
 from base64 import b64encode
 from io import BytesIO
 from PIL import Image
@@ -32,27 +34,28 @@ def find_dominant_color(img):
     return dominant_color
 
 def rgb_to_lab(img_rgb):
-    img_lab = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2Lab)
+    img_lab = rgb2lab(img_rgb)
     return img_lab
 
 def lab_to_rgb(img_lab):
-    img_rgb = cv2.cvtColor(img_lab, cv2.COLOR_Lab2RGB)
+    img_rgb = lab2rgb(img_lab)
+    img_rgb = (img_rgb * 255).astype(np.uint8)
     return img_rgb
 
-def color_transfer(source, target):
-    source_lab = cv2.cvtColor(source, cv2.COLOR_RGB2Lab)
-    target_lab = cv2.cvtColor(target, cv2.COLOR_RGB2Lab)
-
-    # Compute mean and standard deviation of each channel
-    source_mean, source_std = cv2.meanStdDev(source_lab)
-    target_mean, target_std = cv2.meanStdDev(target_lab)
-
-    # Perform color transfer
-    result_lab = (target_std / source_std) * (source_lab - source_mean) + target_mean
-    result_lab = np.clip(result_lab, 0, 255).astype(np.uint8)
-
-    result_rgb = cv2.cvtColor(result_lab, cv2.COLOR_Lab2RGB)
-    return result_rgb
+def change_dominant_color_lab(img_lab, target_color_lab, replacement_color_lab, threshold=15, intensity_threshold_factor=50, blending_ratio=0.5):
+    distance = np.linalg.norm(img_lab[:, :, 1:] - target_color_lab[:, 1:], axis=-1)
+    
+    # Adjust intensity threshold based on the average intensity of the target color
+    target_intensity = target_color_lab[0, 0]
+    intensity_threshold = target_intensity / intensity_threshold_factor
+    
+    # Consider all pixels for replacement (no intensity threshold)
+    mask = distance < threshold
+    
+    # Increase blending power for all pixels (adjust the ratio as needed)
+    img_lab[mask, 1:] = blending_ratio * replacement_color_lab[1:] + (1 - blending_ratio) * img_lab[mask, 1:]
+    
+    return img_lab
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'jpg', 'jpeg', 'png'}
@@ -103,8 +106,15 @@ def show_changed_image():
     color_index = int(request.form['color_index'])
 
     # Target only the dominant color in the single image
-    target_color_lab = rgb_to_lab(np.array([find_dominant_color(img_single_rgb)]))
-    img_color_changed_rgb = color_transfer(np.copy(img_single_rgb), dominant_colors_group_lab[color_index - 1])
+    img_color_changed_lab = change_dominant_color_lab(
+        np.copy(img_single_lab),
+        rgb_to_lab(np.array([find_dominant_color(img_single_rgb)])),
+        dominant_colors_group_lab[color_index - 1],
+        threshold=35,
+        intensity_threshold_factor=50,  # Adjust this factor as needed
+        blending_ratio=0.7  # Adjust blending ratio for better results
+    )
+    img_color_changed_rgb = lab_to_rgb(img_color_changed_lab)
 
     img_buffer = BytesIO()
     pil_image = Image.fromarray(img_color_changed_rgb)
