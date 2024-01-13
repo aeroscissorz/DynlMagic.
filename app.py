@@ -2,7 +2,7 @@ from flask import Flask, render_template, request
 import os
 import cv2
 import numpy as np
-from skimage.color import rgb2lab, lab2rgb
+from skimage.color import rgb2lab, lab2rgb, lab2lch, lch2lab
 from base64 import b64encode
 from io import BytesIO
 from PIL import Image
@@ -42,10 +42,21 @@ def lab_to_rgb(img_lab):
     img_rgb = (img_rgb * 255).astype(np.uint8)
     return img_rgb
 
-def change_hue(img_rgb, target_hue=0):
-    img_hsv = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV)
-    img_hsv[:, :, 0] = target_hue
-    img_hue_changed_rgb = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB)
+def rgb_to_lch(img_rgb):
+    img_lab = rgb2lab(img_rgb)
+    img_lch = lab2lch(img_lab)
+    return img_lch
+
+def lch_to_rgb(img_lch):
+    img_lab = lch2lab(img_lch)
+    img_rgb = lab2rgb(img_lab)
+    img_rgb = (img_rgb * 255).astype(np.uint8)
+    return img_rgb
+
+def change_hue_lch(img_rgb, target_hue=0):
+    img_lch = rgb_to_lch(img_rgb)
+    img_lch[:, :, 2] = target_hue
+    img_hue_changed_rgb = lch_to_rgb(img_lch)
     return img_hue_changed_rgb
 
 def adjust_hsi_values(img_lab, hue_diff, saturation_diff, intensity_diff):
@@ -90,7 +101,7 @@ def index():
             img_single_rgb = cv2.cvtColor(img_single, cv2.COLOR_BGR2RGB)
             
             # Change the hue of the single image to (0, 0, 0)
-            img_single_rgb = change_hue(img_single_rgb, target_hue=0)
+            img_single_rgb = change_hue_lch(img_single_rgb, target_hue=0)
 
             img_group = cv2.imdecode(np.frombuffer(group_image.read(), np.uint8), cv2.IMREAD_COLOR)
             img_group = cv2.cvtColor(img_group, cv2.COLOR_BGR2RGB)
@@ -123,21 +134,15 @@ def show_changed_image():
     target_color_lab = rgb_to_lab(np.array([find_dominant_color(img_single_rgb)]))
     dominant_color_group_lab = dominant_colors_group_lab[color_index - 1]
 
-    # Calculate HSI difference between target color and dominant color in group image
-    hue_diff = dominant_color_group_lab[1] - target_color_lab[0, 1]
-    saturation_diff = dominant_color_group_lab[2] - target_color_lab[0, 2]
-    intensity_diff = dominant_color_group_lab[0] - target_color_lab[0, 0]
+    # Convert to LCh space for more accurate hue change
+    target_color_lch = lab2lch(target_color_lab)
+    dominant_color_group_lch = lab2lch(np.array([dominant_color_group_lab]))
 
-    # Handle special case for black color
-    if np.all(target_color_lab == [0, 0, 0]):
-        # If the target color is black, directly adjust intensity
-        img_single_lab[:, :, 0] += intensity_diff
-        img_single_lab[:, :, 0] = np.clip(img_single_lab[:, :, 0], 0, 100)  # Clip intensity values between 0 and 100
-    else:
-        # Adjust HSI values of the single image to match the dominant color in the group image
-        img_single_lab = adjust_hsi_values(img_single_lab, hue_diff, saturation_diff, intensity_diff)
+    # Calculate hue difference in LCh space
+    hue_diff = dominant_color_group_lch[0, 2] - target_color_lch[0, 2]
 
-    img_single_rgb_changed = lab_to_rgb(img_single_lab)
+    # Adjust hue in the single image
+    img_single_rgb_changed = change_hue_lch(img_single_rgb, target_hue=hue_diff)
 
     img_buffer = BytesIO()
     pil_image = Image.fromarray(img_single_rgb_changed)
