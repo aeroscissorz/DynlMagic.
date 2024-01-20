@@ -24,6 +24,11 @@
             <div id="modifiedImage">
                 <h2>Changed Image:</h2>
                 <img class="changed-image" src="{{ changed_image }}" alt="Changed Image">
+                <div>
+                    <a href="{{ url_for('download_changed_image', temp_file_path=temp_file_path) }}" download="changed_image.png">
+                        <button type="button">Download Changed Image</button>
+                    </a>
+                </div>
             </div>
         {% endif %}
         {% if not color_changed %}

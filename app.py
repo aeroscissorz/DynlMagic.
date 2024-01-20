@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_file
 import os
 import cv2
 import numpy as np
@@ -105,14 +105,13 @@ def show_changed_image():
 
     color_index = int(request.form['color_index'])
 
-    # Target only the dominant color in the single image
     img_color_changed_lab = change_dominant_color_lab(
         np.copy(img_single_lab),
         rgb_to_lab(np.array([find_dominant_color(img_single_rgb)])),
         dominant_colors_group_lab[color_index - 1],
         threshold=35,
-        intensity_threshold_factor=50,  # Adjust this factor as needed
-        blending_ratio=0.7  # Adjust blending ratio for better results
+        intensity_threshold_factor=50,
+        blending_ratio=0.7
     )
     img_color_changed_rgb = lab_to_rgb(img_color_changed_lab)
 
@@ -124,10 +123,24 @@ def show_changed_image():
     changed_image = f'data:image/png;base64,{img_b64}'
     color_changed = True
 
+    # Save the image temporarily for downloading
+    temp_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'changed_image.png')
+    pil_image.save(temp_file_path)
+
     return render_template('index.html', changed_image=changed_image, single_image_preview=get_image_preview(img_single_rgb),
                            group_image_preview=get_image_preview(img_group),
                            dominant_colors_group=[list(color) for color in dominant_colors_group_lab],
-                           color_changed=color_changed)
+                           color_changed=color_changed, temp_file_path=temp_file_path)
+
+@app.route('/download_changed_image')
+def download_changed_image():
+    # Provide the option to download the changed image
+    temp_file_path = request.args.get('temp_file_path', default='', type=str)
+
+    if os.path.exists(temp_file_path):
+        return send_file(temp_file_path, as_attachment=True)
+    else:
+        return "Error: The file does not exist."
 
 if __name__ == '__main__':
     app.run(debug=True)
